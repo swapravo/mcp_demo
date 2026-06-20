@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from openai import AsyncOpenAI
 from dotenv import load_dotenv
-from typing import List
+from typing import List, Union, Any
 
 # Load .env from the root directory (one level up from backend/)
 root_env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
@@ -23,11 +23,11 @@ app.add_middleware(
 
 class Message(BaseModel):
     role: str
-    content: str
+    content: Union[str, List[Any]]
 
 class ChatRequest(BaseModel):
     messages: List[Message]
-    model: str = "openai/gpt-4o-mini"
+    model: str = "google/gemini-3.1-pro-preview"
 
 # Initialize OpenRouter client
 # OpenRouter uses the OpenAI SDK format

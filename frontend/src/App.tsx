@@ -3,14 +3,16 @@ import ChatBubble from './components/ChatBubble';
 
 interface Message {
   role: 'user' | 'assistant';
-  content: string;
+  content: string | any[];
 }
 
 function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -20,14 +22,41 @@ function App() {
     scrollToBottom();
   }, [messages, isLoading]);
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeImage = () => {
+    setImagePreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || isLoading) return;
+    if ((!input.trim() && !imagePreview) || isLoading) return;
 
-    const userMessage = { role: 'user', content: input.trim() } as Message;
+    let finalContent: string | any[] = input.trim();
+    if (imagePreview) {
+      finalContent = [
+        { type: "text", text: input.trim() || "Here is the image" },
+        { type: "image_url", image_url: { url: imagePreview } }
+      ];
+    }
+
+    const userMessage = { role: 'user', content: finalContent } as Message;
     const newMessages = [...messages, userMessage];
     setMessages(newMessages);
     setInput('');
+    removeImage();
     setIsLoading(true);
 
     try {
@@ -35,7 +64,7 @@ function App() {
       const response = await fetch(`http://localhost:${backendPort}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: newMessages, model: 'openai/gpt-4o-mini' })
+        body: JSON.stringify({ messages: newMessages, model: 'google/gemini-3.1-pro-preview' })
       });
       
       const data = await response.json();
@@ -72,7 +101,7 @@ function App() {
       <div className="messages-container">
         {messages.length === 0 && (
           <div style={{ margin: 'auto', textAlign: 'center', opacity: 0.5, maxWidth: '300px' }}>
-            <p>Welcome! Send a message to start chatting with the AI.</p>
+            <p>Welcome! Send a message or upload an Aadhar card image to start the HR verification demo.</p>
           </div>
         )}
         
@@ -95,7 +124,36 @@ function App() {
       </div>
 
       <div className="input-area">
+        {imagePreview && (
+          <div style={{ position: 'relative', display: 'inline-block', marginBottom: '10px' }}>
+            <img src={imagePreview} alt="preview" style={{ height: '60px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.2)' }} />
+            <button 
+              onClick={removeImage} 
+              style={{ position: 'absolute', top: '-8px', right: '-8px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '50%', width: '20px', height: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px' }}>
+              ✕
+            </button>
+          </div>
+        )}
         <form className="input-form" onSubmit={handleSubmit}>
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            accept="image/*" 
+            onChange={handleFileChange} 
+            style={{ display: 'none' }} 
+          />
+          <button 
+            type="button" 
+            onClick={() => fileInputRef.current?.click()}
+            style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', padding: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'color 0.2s' }}
+            title="Attach Aadhar Card Image"
+            onMouseEnter={(e) => e.currentTarget.style.color = 'white'}
+            onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.7)'}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+            </svg>
+          </button>
           <input
             type="text"
             className="input-field"
@@ -104,7 +162,7 @@ function App() {
             onChange={(e) => setInput(e.target.value)}
             disabled={isLoading}
           />
-          <button type="submit" className="send-button" disabled={!input.trim() || isLoading}>
+          <button type="submit" className="send-button" disabled={(!input.trim() && !imagePreview) || isLoading}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="22" y1="2" x2="11" y2="13"></line>
               <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
