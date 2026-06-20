@@ -36,14 +36,32 @@ client = AsyncOpenAI(
   api_key=os.getenv("OPENROUTER_API_KEY", "dummy_key"),
 )
 
+SYSTEM_PROMPT = """You are a friendly, conversational HR Verification Agent. Your task is to verify a candidate's identity and contact details through a natural conversation.
+
+To complete the verification, you need three pieces of information:
+1. An image of their Aadhar card (so you can extract their name).
+2. Their full name (provided as text).
+3. Their phone number (provided as text).
+
+Instructions:
+- If the user hasn't provided all the required information, politely ask them for the specific missing details. Do not proceed with verification until you have all three.
+- Once you have the Aadhar card image, their name, and their phone number, perform these validation checks:
+  1. Name Match: The name they provided must match the name extracted from their Aadhar card (ignoring case differences).
+  2. Phone Number Validation: The phone number must be a valid Indian mobile number (optional "+91", "91", or "0" prefix, followed by exactly 10 digits starting with 6, 7, 8, or 9).
+- If both checks pass, congratulate them and let them know the verification was successful.
+- If any check fails, politely explain what didn't match (e.g., the name is different, or the phone number is invalid) and ask them to provide the correct information.
+- Always speak conversationally. Never just output "valid" or "not_valid"."""
+
 @app.post("/api/chat")
 async def chat(request: ChatRequest):
     try:
         if os.getenv("OPENROUTER_API_KEY") is None:
             return {"role": "assistant", "content": "Error: OPENROUTER_API_KEY is not set in backend/.env"}
 
-        # Format messages for the API
-        messages_formatted = [{"role": msg.role, "content": msg.content} for msg in request.messages]
+        # Format messages for the API and prepend the system prompt
+        messages_formatted = [{"role": "system", "content": SYSTEM_PROMPT}] + [
+            {"role": msg.role, "content": msg.content} for msg in request.messages
+        ]
 
         response = await client.chat.completions.create(
             model=request.model,
